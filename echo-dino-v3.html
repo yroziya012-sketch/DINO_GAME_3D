@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>DINO 3D</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#000;font-family:'Segoe UI',system-ui,sans-serif;color:#fff;user-select:none;touch-action:none}
+canvas{position:fixed;inset:0;width:100%;height:100%}
+/* Overlay layers */
+#vig{position:fixed;inset:0;pointer-events:none;z-index:1;background:radial-gradient(ellipse at center,transparent 55%,#0008 100%)}
+body.n #vig{background:radial-gradient(ellipse at center,transparent 30%,#000e 100%)}
+#fade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .6s;z-index:12}
+#fade.in{opacity:1}
+#cross{position:fixed;left:50%;top:50%;width:16px;height:16px;margin:-8px;pointer-events:none;z-index:4}
+#cross::before,#cross::after{content:'';position:absolute;background:#ffffffcc;border-radius:2px}
+#cross::before{width:2px;height:100%;left:50%;transform:translateX(-50%)}
+#cross::after{height:2px;width:100%;top:50%;transform:translateY(-50%)}
+#tbar{position:fixed;left:50%;top:12px;transform:translateX(-50%);width:220px;height:7px;background:#0008;border-radius:4px;display:none;z-index:6}
+#tbar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#ff4d4d,#ff9a3d);border-radius:4px;transition:width .1s linear}
+/* HUD */
+#hud{position:fixed;left:12px;top:12px;z-index:4;font-size:14px;line-height:1.8;background:#00000077;backdrop-filter:blur(6px);border-radius:12px;padding:8px 14px;border:1px solid #ffffff18}
+#hmsg{position:fixed;left:50%;bottom:140px;transform:translateX(-50%);z-index:4;text-align:center;max-width:88vw;font-size:16px;font-weight:600;text-shadow:0 2px 8px #000;opacity:0;transition:opacity .3s;pointer-events:none;padding:8px 18px;background:#00000099;border-radius:10px}
+/* Night mode toggle btn */
+#nmBtn{position:fixed;right:12px;top:12px;z-index:4;padding:9px 15px;border-radius:11px;border:0;background:#00000099;color:#fff;cursor:pointer;font-size:14px;backdrop-filter:blur(6px);border:1px solid #ffffff22}
+/* Mobile pad */
+.pad{position:fixed;left:10px;bottom:10px;display:grid;grid-template-columns:repeat(3,48px);gap:4px;z-index:5}
+.pad button{height:48px;font-size:20px;border-radius:10px;border:0;background:#ffffff22;color:#fff;cursor:pointer;backdrop-filter:blur(4px)}
+#fireBtn{position:fixed;right:14px;bottom:14px;width:72px;height:72px;border-radius:50%;border:0;background:#ff4d4dbb;color:#fff;font-size:13px;z-index:5;cursor:pointer;display:none;backdrop-filter:blur(4px)}
+/* Modals */
+.modal{position:fixed;inset:0;background:#000000cc;display:none;align-items:center;justify-content:center;padding:14px;z-index:10;backdrop-filter:blur(8px)}
+.modal.show{display:flex}
+.card{background:linear-gradient(160deg,#101c2c,#0d1620);border:1px solid #2a4a6a;border-radius:18px;padding:22px;max-width:500px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px #000a}
+.card::-webkit-scrollbar{width:4px}.card::-webkit-scrollbar-thumb{background:#2a4a6a;border-radius:2px}
+.card h2{font-size:20px;color:#ffd24a;margin-bottom:4px}
+.card .sub{font-size:13px;opacity:.6;margin-bottom:14px}
+.card p{line-height:1.6;margin:5px 0;font-size:14px}
+.card button{display:block;width:100%;margin:5px 0;padding:12px 14px;border-radius:11px;border:1px solid #2a4a6a;background:#182538;color:#fff;font-size:15px;cursor:pointer;text-align:left;transition:background .15s,transform .1s}
+.card button:hover{background:#22354e}
+.card button:active{transform:scale(.98)}
+.card button.big{background:linear-gradient(135deg,#ff5c3d,#ff9a3d);border:0;text-align:center;font-weight:700;font-size:16px}
+.card button.big:hover{background:linear-gradient(135deg,#ff7a5a,#ffb060)}
+.card button:disabled{opacity:.35;cursor:default}
+.card .row{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e3348;padding:7px 0;font-size:14px}
+.card .row button{width:auto;margin:0;padding:7px 14px;font-size:13px}
+/* Intro */
+#intro{position:fixed;inset:0;z-index:20;background:linear-gradient(160deg,#060d16 0%,#0d1e35 60%,#02070e 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0}
+#intro .logo{font-size:clamp(44px,10vw,80px);font-weight:900;letter-spacing:.12em;color:#fff;text-shadow:0 0 40px #3af,0 0 80px #0af3}
+#intro .sub{font-size:clamp(13px,3vw,18px);opacity:.6;letter-spacing:.4em;margin-top:6px;margin-bottom:36px}
+#intro .nav{display:flex;flex-direction:column;gap:10px;width:100%;max-width:320px}
+#intro .nav button{padding:15px;font-size:16px;font-weight:600;border-radius:14px;border:0;cursor:pointer;transition:transform .15s,box-shadow .15s}
+#intro .nav button:active{transform:scale(.97)}
+#intro .play{background:linear-gradient(135deg,#ff5c3d,#ff9a3d);color:#fff;box-shadow:0 8px 28px #ff5c3d55}
+#intro .play:hover{box-shadow:0 12px 36px #ff5c3d88}
+#intro .tests{background:#172234;color:#fff;border:1px solid #2a4a6a}
+#intro .shop{background:#172234;color:#fff;border:1px solid #2a4a6a}
+#intro .settings{background:#172234;color:#fff;border:1px solid #2a4a6a}
+#intro .stars{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+/* Err */
+#err{position:fixed;left:0;right:0;bottom:0;background:#900d;font:12px monospace;display:none;padding:6px;z-index:30;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="vig"></div><div id="fade"></div>
+<div id="cross" style="display:none"></div>
+<div id="tbar"><i id="tbi"></i></div>
+<div id="hud" style="display:none"></div>
+<div id="hmsg"></div>
+<button id="nmBtn" style="display:none">☀ Kunduz</button>
+<div class="pad">
+  <span></span><button data-k="KeyW">▲</button><span></span>
+  <button data-k="KeyA">◀</button><button data-k="KeyS">▼</button><button data-k="KeyD">▶</button>
+</div>
+<button id="fireBtn">🔫</button>
+<div id="err"></div>
+
+<!-- INTRO ekran -->
+<div id="intro">
+  <div class="stars" id="starsEl"></div>
+  <div class="logo">DINO 3D</div>
+  <div class="sub">TA'LIM · SARGUZASHT · HORROR</div>
+  <div class="nav">
+    <button class="play" id="i_play">▶ &nbsp;O'YIN BOSHLASH</button>
+    <button class="tests" id="i_tests">🧪 &nbsp;TESTLAR</button>
+    <button class="shop" id="i_shop">🛒 &nbsp;DO'KON</button>
+    <button class="settings" id="i_settings">⚙️ &nbsp;SOZLAMALAR</button>
+  </div>
+</div>
+
+<!-- Sozlamalar modal -->
+<div id="settingsModal" class="modal">
+  <div class="card">
+    <h2>⚙️ Sozlamalar</h2>
+    <div class="sub">Barcha o'yin sozlamalari</div>
+    <div class="row"><span>Grafika sifati</span>
+      <div style="display:flex;gap:5px">
+        <button id="sq0">Past</button><button id="sq1">O'rta</button><button id="sq2">Yuqori</button>
+      </div>
+    </div>
+    <div class="row"><span>Sichqoncha sezgirligi</span>
+      <input type="range" id="sensR" min="1" max="10" value="5" style="width:100px">
+      <span id="sensV" style="min-width:24px;text-align:right">5</span>
+    </div>
+    <div class="row"><span>Ovoz</span>
+      <input type="range" id="volR" min="0" max="10" value="8" style="width:100px">
+      <span id="volV" style="min-width:24px;text-align:right">8</span>
+    </div>
+    <div class="row"><span>Kun/Tun rejimi</span>
+      <div style="display:flex;gap:5px">
+        <button id="sq_day">☀ Kun</button><button id="sq_night">🌙 Tun</button>
+      </div>
+    </div>
+    <div class="row"><span>Video yozish</span>
+      <button id="recBtn">● Boshlash (B)</button>
+    </div>
+    <div class="row"><span>O'yinni saqlash</span><button id="sq_save">💾 Saqlash</button></div>
+    <div class="row"><span>Saqlangandan o'ynash</span><button id="sq_load">📂 Yuklash</button></div>
+    <button class="big" style="margin-top:10px" id="sq_close">Yopish</button>
+  </div>
+</div>
+
+<!-- Testlar modal -->
+<div id="testsModal" class="modal">
+  <div class="card" id="testsCard">
+    <h2>🧪 Testlar</h2>
+    <div class="sub">Bilimingizni sinab ko'ring va ball yig'ing</div>
+    <div id="testsBody"></div>
+    <button class="big" id="tc_close">Yopish</button>
+  </div>
+</div>
+
+<!-- Do'kon modal -->
+<div id="shopModal" class="modal">
+  <div class="card" id="shopCard">
+    <h2>🛒 Do'kon</h2>
+    <div class="sub" id="shopBal"></div>
+    <div id="shopBody"></div>
+    <button class="big" id="sh_close">Yopish</button>
+  </div>
+</div>
+
+<!-- Bilim kitobi modal -->
+<div id="bookModal" class="modal">
+  <div class="card" id="bookCard">
+    <h2>📖 Bilimlar kitobi</h2>
+    <div id="bookBody"></div>
+    <button class="big" id="bk_close">Yopish</button>
+  </div>
+</div>
+
+<!-- Savol (o'yin ichida) modal -->
+<div id="quizModal" class="modal">
+  <div class="card" id="quizCard"></div>
+</div>
+
+<!-- G'alaba modal -->
+<div id="winModal" class="modal">
+  <div class="card" id="winCard"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+"use strict";
+const $=i=>document.getElementById(i),rnd=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+addEventListener("error",e=>{$("err").style.display="block";$("err").textContent="Xato: "+e.message+"\n"+e.filename+":"+e.lineno});
+const V=THREE.Vector3;
+
+// ── Bilim bazasi ──────────────────────────────────────────────────
+const POOL=[
+ {s:"Biologiya",   q:"Dinozavrlar qaysi hayvonlar guruhiga kiradi?",           o:["Sudralib yuruvchilar","Sut emizuvchilar","Suv hayvonlari"],       a:0, f:"Dinozavrlar sudralib yuruvchilar bo'lib, qushlar ularning tirik avlodi hisoblanadi."},
+ {s:"Fizika",      q:"Tosh yuqoriga otilgach nima uchun yerga qaytadi?",        o:["Magnit kuchi","Gravitatsiya","Shamol"],                           a:1, f:"Gravitatsiya barcha jismlarni Yer markazi tomon tortadi. Bu Newton 2-qonuniga bog'liq."},
+ {s:"Ekologiya",   q:"O'simliklar kislorodni qaysi jarayonda hosil qiladi?",   o:["Nafas olish","Fotosintez","Chirish"],                             a:1, f:"Fotosintezda o'simliklar Quyosh energiyasi yordamida CO₂ va suvdan kislorod hosil qiladi."},
+ {s:"Kimyo",       q:"Suvning kimyoviy formulasi qanday?",                      o:["CO₂","H₂O","NaCl"],                                              a:1, f:"Suv molekulasi 2 ta vodorod (H) va 1 ta kislorod (O) atomidan iborat — H₂O."},
+ {s:"Informatika", q:"Kompyuter ikkilik (binary) tizimida qaysi raqamlardan foydalanadi?", o:["0 va 1","1 dan 9 gacha","0 dan 7 gacha"],            a:0, f:"Kompyuterlar ma'lumotni 0 va 1 — bit (binary digit) orqali saqlaydi va qayta ishlaydi."},
+ {s:"Kiberxavfsizlik",q:"Qaysi parol eng xavfsiz?",                            o:["123456","Ismingiz","Uzun harf+raqam+belgi aralash"],              a:2, f:"Uzun va turli belgilardan iborat parollarni brute-force bilan topish deyarli imkonsiz."},
+ {s:"Astronomiya",  q:"Quyosh sistemasida eng katta sayyora qaysi?",           o:["Saturn","Yupiter","Neptun"],                                      a:1, f:"Yupiter — quyosh sistemasidagi eng katta sayyora bo'lib, Yerdan 1300 marta kattaroq."},
+ {s:"Matematika",   q:"Uchburchakning barcha burchaklari yig'indisi qancha?",  o:["90°","180°","270°"],                                             a:1, f:"Har qanday uchburchak burchaklari yig'indisi doim 180° ga teng — bu Evklid geometriyasining asosi."},
+ {s:"Geografiya",   q:"Dunyodagi eng uzun daryo qaysi?",                       o:["Amazon","Nil","Yanszi"],                                          a:1, f:"Nil daryosi ~6650 km uzunligi bilan dunyodagi eng uzun daryo hisoblanadi."},
+ {s:"Tarix",        q:"Birinchi Jahon urushi qaysi yilda boshlandi?",           o:["1912","1914","1917"],                                             a:1, f:"Birinchi Jahon urushi 1914 yilda Avstriya-Vengriyaning Serbiyaga urush e'lon qilishi bilan boshlandi."}
+];
+const DONE=Array(POOL.length).fill(false);
+
+// ── Global holat ─────────────────────────────────────────────────
+const G={pts:0,learned:[],hearts:3,night:false,own:["pistol"],cur:"pistol",ammo:{shotgun:0,rifle:0},
+ started:false,modal:false,cycleT:0,inv:0,nextTest:0,quizT:0,vol:0.8,sens:5};
+let qMode=null,qIdx=0,qStation=null,qMon=null,qHid=new Set();
+let T=0,hurtFx=0,cdT=0,shotT=0,respawnT=0,nextNote=0,nextScream=5,nextBeat=0;
+const WEP={pistol:{n:"To'pponcha",dmg:1,cd:.4,pel:1,sp:0},shotgun:{n:"Miltiq",dmg:1,cd:.9,pel:6,sp:.07},rifle:{n:"Avtomat",dmg:1,cd:.12,pel:1,sp:.02}};
+const SHOPLIST=[
+ {id:"shotgun", n:"🔫 Miltiq",          p:150, desc:"Yaqin masofada kuchli"},
+ {id:"rifle",   n:"🔫 Avtomat",         p:300, desc:"Tez-tez otadi"},
+ {id:"ammo",    n:"🧨 O'q-dori (+20)",  p:40,  desc:"Avtomat yoki miltiqqa"},
+ {id:"med",     n:"💊 Tibbiy paket",    p:60,  desc:"+1 ❤ qo'shadi"},
+ {id:"shield",  n:"🛡 Qalqon",          p:120, desc:"Maxluqdan 1 marta himoya"}
+];
+
+// ── Grafika sozlama ──────────────────────────────────────────────
+const QS={low:{pr:1,sh:0,sm:512,pt:40},med:{pr:1.25,sh:1,sm:1024,pt:100},high:{pr:Math.min(devicePixelRatio,2),sh:1,sm:2048,pt:160}};
+let QL=localStorage.getItem("dino_q")||(navigator.hardwareConcurrency<=4?"med":"high"),Q=()=>QS[QL];
+
+// ── Renderer ─────────────────────────────────────────────────────
+const R=new THREE.WebGLRenderer({canvas:$("c"),antialias:true,powerPreference:"high-performance"});
+R.outputEncoding=THREE.sRGBEncoding;R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.1;
+R.setPixelRatio(Q().pr);R.setSize(innerWidth,innerHeight);
+R.shadowMap.enabled=Q().sh>0;R.shadowMap.type=THREE.PCFSoftShadowMap;
+const sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,250);sc.add(cam);
+
+// Yorug'lik
+const hemi=new THREE.HemisphereLight(0xcfeaff,0x3a6b30,1);
+const sun=new THREE.DirectionalLight(0xfff1d6,1.4);sun.castShadow=Q().sh>0;
+Object.assign(sun.shadow.camera,{left:-25,right:25,top:25,bottom:-25,far:100});
+sun.shadow.mapSize.set(Q().sm,Q().sm);sun.shadow.bias=-.0008;sun.shadow.normalBias=.03;
+const moon=new THREE.DirectionalLight(0x334466,.6);moon.position.set(-10,15,-8);moon.visible=false;
+const torchL=new THREE.SpotLight(0xfff3d0,0,30,.4,.5,1.2);
+sc.add(hemi,sun,sun.target,moon,torchL,torchL.target);
+sc.background=new THREE.Color(0x9fd8ff);sc.fog=new THREE.Fog(0x9fd8ff,30,120);
+addEventListener("resize",()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)});
+
+// Qurol (kameraga biriktirilgan)
+const gunGrp=new THREE.Group();
+const gM=new THREE.MeshStandardMaterial({color:0x2a2f36,roughness:.35,metalness:.75});
+const gB=new THREE.Mesh(new THREE.BoxGeometry(.07,.11,.38),gM);gB.position.z=-.19;
+const gBar=new THREE.Mesh(new THREE.CylinderGeometry(.012,.012,.38,8),gM);gBar.rotation.x=Math.PI/2;gBar.position.set(0,.065,-.19);
+gunGrp.add(gB,gBar);gunGrp.position.set(.24,-.21,-.48);cam.add(gunGrp);
+
+// ── Tekstura yordamchi ───────────────────────────────────────────
+function nTex(rep,opts={}){
+ const c=document.createElement("canvas");c.width=c.height=256;const g=c.getContext("2d");
+ g.fillStyle=opts.base||"#fff";g.fillRect(0,0,256,256);
+ for(let i=0;i<(opts.dots||2500);i++){const v=Math.random()*80|0;g.fillStyle=`rgba(${v},${v},${v},.15)`;g.fillRect(Math.random()*256,Math.random()*256,rnd(1,3),rnd(1,3))}
+ for(let i=0;i<(opts.blobs||10);i++){g.fillStyle=opts.blobC||"rgba(0,0,0,.06)";g.beginPath();g.arc(Math.random()*256,Math.random()*256,rnd(8,36),0,7);g.fill()}
+ const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rep,rep);t.encoding=THREE.sRGBEncoding;return t}
+
+// ── Dunyo ────────────────────────────────────────────────────────
+const gndMat=new THREE.MeshStandardMaterial({map:nTex(18),color:0x7fc86b,roughness:.95,metalness:0});
+const gnd=new THREE.Mesh(new THREE.PlaneGeometry(70,70),gndMat);gnd.rotation.x=-Math.PI/2;gnd.receiveShadow=true;sc.add(gnd);
+
+// Devor (chegaralar)
+[[0,-35,70,.5,6],[0,35,70,.5,6],[-35,0,.5,70,6],[35,0,.5,70,6]].forEach(([x,z,w,d,h])=>{
+ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:0x4a5a3a,roughness:1}));
+ m.position.set(x,h/2,z);m.receiveShadow=true;sc.add(m)});
+
+// Daraxtlar va toshlar
+const OB=[],sp=new THREE.SphereGeometry(1,10,8),bx=new THREE.BoxGeometry(1,1,1),cn=new THREE.ConeGeometry(1,1,7);
+function tree(x,z){const g=new THREE.Group(),
+ tm=new THREE.MeshStandardMaterial({color:0x7a5230,roughness:.9,map:nTex(2,{base:"#c8a070",dots:800})}),
+ cm=new THREE.MeshStandardMaterial({color:0x2f8a44,roughness:.85,map:nTex(2,{base:"#5aaa66",blobC:"rgba(0,60,0,.12)"})});
+ const tr=new THREE.Mesh(new THREE.CylinderGeometry(.22,.3,1.7,7),tm);tr.position.y=.85;tr.castShadow=true;
+ const co=new THREE.Mesh(new THREE.ConeGeometry(1.15,2.3,8),cm);co.position.y=2.5;co.castShadow=true;
+ g.add(tr,co);g.position.set(x,0,z);return g}
+function rock(x,z){const r=.6+Math.random()*.5,m=new THREE.MeshStandardMaterial({color:0x8a909b,roughness:1,map:nTex(1,{base:"#aab0bb"})});
+ const o=new THREE.Mesh(new THREE.DodecahedronGeometry(r,0),m);o.position.set(x,r*.5,z);o.rotation.y=Math.random()*6;o.castShadow=true;o.receiveShadow=true;return o}
+for(let k=0;k<30;k++){const x=rnd(-28,28),z=rnd(-28,28);
+ if(Math.hypot(x,z)<6||[[0,-22],[22,-22],[0,0]].some(s=>Math.hypot(s[0]-x,s[1]-z)<4))continue;
+ const tr=k%4!==0,o=tr?tree(x,z):rock(x,z);sc.add(o);OB.push({x,z,r:tr?.65:.85+Math.random()*.4})}
+
+// Laboratoriya stansiyalari (kunduz: yashil, faqat bilim o'rgatadi)
+const STM=[];
+const stPos=[[-10,-8,0],[10,-10,1],[0,9,2],[-15,13,3],[15,13,4],[0,-17,5]];
+stPos.forEach(([x,z,i])=>{const g=new THREE.Group();
+ const base=new THREE.Mesh(new THREE.CylinderGeometry(1.5,.8,.5,16),new THREE.MeshStandardMaterial({color:0x2a3d50,roughness:.6,metalness:.4}));base.position.y=.25;base.castShadow=true;
+ const ring=new THREE.Mesh(new THREE.TorusGeometry(1.1,.13,8,28),new THREE.MeshBasicMaterial({color:0x4ef0a0}));ring.rotation.x=Math.PI/2;ring.position.y=.15;
+ const col=new THREE.Mesh(new THREE.CylinderGeometry(.18,.22,.8,10),new THREE.MeshStandardMaterial({color:0x334455,roughness:.4,metalness:.6,emissive:0x001a0a}));col.position.y=.9;
+ const top=new THREE.Mesh(new THREE.SphereGeometry(.22,10,8),new THREE.MeshBasicMaterial({color:0x4ef0a0}));top.position.y=1.35;
+ g.add(base,ring,col,top);g.position.set(x,0,z);sc.add(g);STM.push({x,z,i,g,ring,top})});
+
+// Chiqish portali
+const exitRing=new THREE.Mesh(new THREE.TorusGeometry(1.8,.22,8,36),new THREE.MeshBasicMaterial({color:0xffd24a}));
+exitRing.rotation.x=Math.PI/2;exitRing.position.set(24,.22,-24);exitRing.visible=false;
+const exitGlow=new THREE.Mesh(new THREE.CircleGeometry(1.6,24),new THREE.MeshBasicMaterial({color:0xffd24a,transparent:true,opacity:.18,depthWrite:false}));
+exitGlow.rotation.x=-Math.PI/2;exitGlow.position.set(24,.05,-24);exitGlow.visible=false;
+sc.add(exitRing,exitGlow);
+
+// Zarrachalar
+const ptGeo=new THREE.BufferGeometry(),ptArr=new Float32Array(160*3);
+for(let i=0;i<160;i++){ptArr[i*3]=rnd(-28,28);ptArr[i*3+1]=rnd(.3,7);ptArr[i*3+2]=rnd(-28,28)}
+ptGeo.setAttribute("position",new THREE.BufferAttribute(ptArr,3));ptGeo.setDrawRange(0,Q().pt);
+const ptMat=new THREE.PointsMaterial({size:.14,color:0xfff3c4,transparent:true,opacity:.7,depthWrite:false,sizeAttenuation:true});
+const pts=new THREE.Points(ptGeo,ptMat);sc.add(pts);
+
+// ── Dino model ───────────────────────────────────────────────────
+function mkDino(col){
+ const g=new THREE.Group(),
+  bm=new THREE.MeshStandardMaterial({color:col,roughness:.6,metalness:.05}),
+  lm=new THREE.MeshStandardMaterial({color:0xd9f4a0,roughness:.6}),
+  em=new THREE.MeshStandardMaterial({color:0xffffff,roughness:.2}),
+  pm=new THREE.MeshStandardMaterial({color:0x0d0d0d}),
+  mm=new THREE.MeshStandardMaterial({color:0x2a0a0a}),
+  d={g,legs:[],head:new THREE.Group(),pups:[],mouth:null,bm,em};
+ const P=(par,geo,m,x,y,z,sx,sy,sz)=>{const o=new THREE.Mesh(geo,m);o.position.set(x,y,z);o.scale.set(sx,sy,sz);o.castShadow=true;par.add(o);return o};
+ P(g,bx,bm,0,1,0,.9,.8,1.2);P(g,bx,lm,0,.7,.05,.7,.3,1);
+ d.head.position.set(0,1.52,.58);g.add(d.head);
+ P(d.head,bx,bm,0,0,0,.82,.72,.82);P(d.head,bx,bm,0,-.05,.5,.52,.36,.52);
+ for(const sx of[-.22,.22]){P(d.head,sp,em,sx,.15,.42,.2,.2,.2);d.pups.push(P(d.head,sp,pm,sx,.15,.58,.09,.09,.09))}
+ d.mouth=P(d.head,bx,mm,0,-.22,.44,.38,.05,.05);
+ const tl=new THREE.Mesh(cn,bm);tl.position.set(0,.9,-.98);tl.scale.set(.26,.95,.26);tl.rotation.x=-Math.PI/2;tl.castShadow=true;g.add(tl);
+ for(const sx of[-.3,.3]){const lp=new THREE.Group();lp.position.set(sx,.62,0);P(lp,bx,bm,0,-.3,0,.24,.62,.24);g.add(lp);d.legs.push(lp)}
+ return d}
+function animDino(d,t,mv,night){
+ d.g.position.y=Math.abs(Math.sin(t*(mv?10:2.5)))*(mv?.12:.04);
+ const s=mv?Math.sin(t*10)*.72:0;d.legs[0].rotation.x=s;d.legs[1].rotation.x=-s;
+ d.head.rotation.y=night?Math.sin(t*.5)*.75:Math.sin(t*1.6)*.35;
+ d.mouth.scale.y=night?.4:1.65;d.pups.forEach(p=>p.scale.setScalar(night?.12:.092));
+ d.bm.color.setHex(night?0x1f4d3d:0x49b86a);d.em.emissive.setHex(night?0x2fb8ff:0)}
+const PD=mkDino(0x49b86a),plGrp=new THREE.Group();plGrp.add(PD.g);sc.add(plGrp);
+
+// Kunduzgi hayvonlar (raqsga tushadi, ziyonsiz)
+const HB=[];
+[[0xe8a33d,.8],[0x9a6fd6,.75],[0x4aa3d6,.78],[0xd66a8a,.72],[0x8bc34a,.77]].forEach(([col,sc2],k)=>{
+ const d=mkDino(col);d.g.scale.setScalar(sc2);d.g.position.set(rnd(-18,18),0,rnd(-18,18));sc.add(d.g);HB.push({d,tx:d.g.position.x,tz:d.g.position.z})});
+
+// ── Maxluqlar (tun) ──────────────────────────────────────────────
+const MON=[];
+function mkMon(type,x,z,isTest){
+ const g=new THREE.Group();
+ if(type==="ghost"){
+  const m=new THREE.MeshStandardMaterial({color:0xd0eeff,emissive:0x2a8aff,emissiveIntensity:.7,transparent:true,opacity:.55,roughness:.1});
+  const body=new THREE.Mesh(sp,m);body.scale.set(.62,.62,.62);body.position.y=1.6;
+  const e1=new THREE.Mesh(sp,new THREE.MeshBasicMaterial({color:0xff2222}));e1.scale.setScalar(.1);e1.position.set(-.18,1.82,.56);
+  const e2=e1.clone();e2.position.x=.18;
+  g.add(body,e1,e2)}
+ else if(type==="shadow"){
+  const m=new THREE.MeshStandardMaterial({color:0x0d0514,roughness:.8,emissive:0x2a003a,emissiveIntensity:.5});
+  const body=new THREE.Mesh(sp,m);body.scale.set(.8,.65,1.1);body.position.y=.85;
+  const e1=new THREE.Mesh(sp,new THREE.MeshBasicMaterial({color:0xff2a2a}));e1.scale.setScalar(.12);e1.position.set(-.25,1.05,.95);
+  const e2=e1.clone();e2.position.x=.25;g.add(body,e1,e2)}
+ else{// crawler
+  const m=new THREE.MeshStandardMaterial({color:0x1a2410,roughness:.7,emissive:0x001400,emissiveIntensity:.4});
+  const body=new THREE.Mesh(sp,m);body.scale.set(1.1,.55,1.4);body.position.y=.42;
+  const e1=new THREE.Mesh(sp,new THREE.MeshBasicMaterial({color:0xffee00}));e1.scale.setScalar(.1);e1.position.set(-.32,.62,1.3);
+  const e2=e1.clone();e2.position.x=.32;g.add(body,e1,e2)}
+ g.position.set(x,0,z);sc.add(g);
+ const spd={ghost:1.9,shadow:2.7,crawler:3.1}[type];
+ const hp={ghost:2,shadow:3,crawler:4}[type];
+ const m={g,type,hp,sp:spd,ph:Math.random()*6,test:!!isTest};MON.push(m);return m}
+function removeMon(m){sc.remove(m.g);const i=MON.indexOf(m);if(i>=0)MON.splice(i,1);if(m===qMon)qMon=null}
+function clearMons(){MON.slice().forEach(removeMon)}
+function spawnFar(){const a=rnd(0,6.28),r=rnd(18,24);const types=["ghost","shadow","crawler"];mkMon(types[Math.random()*3|0],plGrp.position.x+Math.cos(a)*r,plGrp.position.z+Math.sin(a)*r)}
+
+// ── Ovoz ──────────────────────────────────────────────────────────
+let AC=null,droneOsc=null,droneGain=null;
+function audInit(){if(AC)return;try{AC=new(window.AudioContext||window.webkitAudioContext)();droneOsc=AC.createOscillator();droneOsc.type="sawtooth";droneOsc.frequency.value=42;const f=AC.createBiquadFilter();f.type="lowpass";f.frequency.value=150;droneGain=AC.createGain();droneGain.gain.value=0;droneOsc.connect(f).connect(droneGain).connect(AC.destination);droneOsc.start()}catch(e){}}
+function tone(f,v,l,type,to){if(!AC)return;const o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime;o.type=type||"sine";o.frequency.setValueAtTime(f,t);if(to)o.frequency.exponentialRampToValueAtTime(to,t+l);g.gain.setValueAtTime(v*G.vol,t);g.gain.exponentialRampToValueAtTime(.001,t+l);o.connect(g).connect(AC.destination);o.start(t);o.stop(t+l+.02)}
+function noise(v,l){if(!AC)return;const n=AC.sampleRate*l|0,b=AC.createBuffer(1,n,AC.sampleRate),d=b.getChannelData(0);for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n);const s=AC.createBufferSource(),g=AC.createGain();g.gain.value=v*G.vol;s.buffer=b;s.connect(g).connect(AC.destination);s.start()}
+function ambient(){if(!AC)return;if(droneGain)droneGain.gain.setTargetAtTime(G.night?(.06*G.vol):0,AC.currentTime,.8);
+ if(!G.night&&T>nextNote){tone([523,587,659,784][Math.random()*4|0],.03,1,"triangle");if(Math.random()<.25)tone(1600+rnd(0,700),.018,.18);nextNote=T+.8}
+ if(G.night&&T>nextScream){noise(.12,1.4);tone(650,.04,1.4,"sawtooth");nextScream=T+rnd(9,22)}
+ const near=MON.some(m=>Math.hypot(m.g.position.x-plGrp.position.x,m.g.position.z-plGrp.position.z)<10);
+ if(G.night&&near&&T>nextBeat){tone(52,.22,.14,"sine");setTimeout(()=>tone(48,.18,.14,"sine"),230);nextBeat=T+.55}}
+
+// ── Kun/Tun ──────────────────────────────────────────────────────
+const SK={day:{bg:0x9fd8ff,fn:30,ff:120,h:1,s:1.4,g:0x7fc86b},night:{bg:0x04050c,fn:7,ff:38,h:.18,s:0,g:0x1b2922}};
+function setNight(v){G.night=v;document.body.classList.toggle("n",v);
+ ptMat.color.setHex(v?0x9ff0ff:0xfff3c4);HB.forEach(h=>h.d.g.visible=!v);
+ sun.visible=!v;moon.visible=v;
+ $("nmBtn").textContent=v?"☀ Kunduz":"🌙 Tun";
+ if(v){clearMons();for(let i=0;i<4;i++)spawnFar();respawnT=T+10}else clearMons();
+ refreshStations();fade(.5);say(v?"🌙 Tun: qoʻrqinchli narsalar uyg'ondi...":"☀ Kun: Dino xursand!",2500)}
+function refreshStations(){STM.forEach(s=>{s.g.visible=!G.night;s.ring.material.color.setHex(DONE[s.i]?0x445566:0x4ef0a0);s.top.material.color.setHex(DONE[s.i]?0x2a3344:0x4ef0a0)});exitRing.visible=exitGlow.visible=DONE.slice(0,STM.length).every(Boolean)}
+
+// ── UI yordamchilar ──────────────────────────────────────────────
+let msgT=0;
+function say(t,ms){$("hmsg").textContent=t;$("hmsg").style.opacity=1;clearTimeout(msgT);msgT=setTimeout(()=>$("hmsg").style.opacity=0,ms||2200)}
+function fade(d){const f=$("fade");f.classList.add("in");setTimeout(()=>f.classList.remove("in"),d*1000)}
+let hudSig="";
+function hud(){const w=WEP[G.cur],am=G.cur==="pistol"?"∞":G.ammo[G.cur];
+ const s=`${G.night?"🌙":"☀"} &nbsp;⭐ <b>${G.pts}</b> &nbsp;${"❤".repeat(G.hearts)||"—"}<br>📖 ${G.learned.length}/${POOL.length} &nbsp;🧪 ${DONE.filter(Boolean).length}/${STM.length} &nbsp;${w.n} ${am}`;
+ if(s!==hudSig){$("hud").innerHTML=s;hudSig=s}}
+
+// ── Bilim sinovi (o'yin ichida) ───────────────────────────────────
+function startQuiz(mode,st,mon){G.modal=true;qMode=mode;qStation=st||null;qMon=mon||null;qHid=new Set();
+ qIdx=mode==="learn"?st.i:(G.learned.length?G.learned[Math.random()*G.learned.length|0]:0);
+ G.quizT=14;if(mode==="test")$("tbar").style.display="block";
+ renderQ()}
+function renderQ(result){const q=POOL[qIdx];
+ let h=`<h2>${qMode==="test"?"👹 Bilim sinovi":"🧪 Yangi bilim"} · ${q.s}</h2><p>${q.q}</p>`;
+ if(result===undefined){h+=q.o.map((x,i)=>qHid.has(i)?"":`<button data-o="${i}">${"ABC"[i]}) ${x}</button>`).join("");
+  if(qMode==="learn")h+=`<button id="qhint">💡 Ipucu (−3 ⭐)</button><button id="qlater">Keyinroq</button>`}
+ else h+=`<p style="color:${result?"#4ef0a0":"#ff7a7a"};font-size:16px"><b>${result?"✅ To'g'ri!":"💀 Noto'g'ri — maxluq sizni yedi!"}</b></p><p>${q.f}</p><button class="big" id="qnx">Davom ▶</button>`;
+ $("quizCard").innerHTML=h;$("quizModal").classList.add("show")}
+$("quizCard").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+ if(b.id==="qlater"){closeQuiz();return}
+ if(b.id==="qnx"){closeQuiz();return}
+ if(b.id==="qhint"){if(G.pts<3){say("3 ⭐ kerak");return}
+  const w=POOL[qIdx].o.map((_,i)=>i).filter(i=>i!==POOL[qIdx].a&&!qHid.has(i));if(!w.length)return;G.pts-=3;qHid.add(w[0]);renderQ();return}
+ if(b.dataset.o===undefined)return;answer(+b.dataset.o)});
+function answer(i){const q=POOL[qIdx],ok=i===q.a;
+ if(qMode==="learn"){if(ok){if(!G.learned.includes(qIdx))G.learned.push(qIdx);DONE[qStation.i]=true;G.pts+=10;refreshStations();saveGame();renderQ(true)}
+  else{qHid.add(i);say("Noto'g'ri! Yana urinib ko'ring 🦖");renderQ()}}
+ else{$("tbar").style.display="none";G.quizT=1e9;
+  if(ok){G.pts+=10;if(qMon)removeMon(qMon);renderQ(true);saveGame()}
+  else{if(qMon)removeMon(qMon);hit(1);renderQ(false)}}}
+function closeQuiz(){$("quizModal").classList.remove("show");G.modal=false;qMode=null;$("tbar").style.display="none";
+ const all=DONE.slice(0,STM.length).every(Boolean);exitRing.visible=exitGlow.visible=all;hud();
+ if(G.hearts<=0)die()}
+
+// ── Testlar modal ─────────────────────────────────────────────────
+let tqIdx=-1,tqHid=new Set();
+function openTests(){G.modal=true;tqIdx=-1;renderTestsHome();$("testsModal").classList.add("show")}
+function renderTestsHome(){$("testsBody").innerHTML=`<p>⭐ Ballar: <b>${G.pts}</b> | Yig'ilgan: ${G.learned.length}/${POOL.length}</p>`+
+ POOL.map((q,i)=>`<div class="row"><span>${q.s}</span><button data-tq="${i}" ${G.pts<2&&!G.learned.includes(i)?"":""}>${G.learned.includes(i)?"🔁 Takrorlash":"🔒 Avval o'rgan"}</button></div>`).join("")+`<p style="font-size:12px;opacity:.6;margin-top:8px">To'g'ri javob: +8 ⭐ | Noto'g'ri: −2 ⭐</p>`}
+$("testsBody").addEventListener("click",e=>{const b=e.target.closest("button[data-tq]");if(!b)return;const i=+b.dataset.tq;if(!G.learned.includes(i)){say("Bu bilimni avval o'yin ichida o'rganishingiz kerak");return}tqIdx=i;tqHid=new Set();renderTestQ()});
+function renderTestQ(){if(tqIdx<0){renderTestsHome();return}const q=POOL[tqIdx];
+ $("testsBody").innerHTML=`<h2 style="margin-bottom:8px">${q.s}</h2><p style="margin-bottom:14px">${q.q}</p>`+
+ q.o.map((x,i)=>tqHid.has(i)?"":`<button data-ta="${i}">${"ABC"[i]}) ${x}</button>`).join("")+
+ `<button id="tback" style="margin-top:10px">← Orqaga</button>`}
+$("testsBody").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+ if(b.id==="tback"){tqIdx=-1;renderTestsHome();return}
+ if(b.dataset.ta===undefined)return;
+ const i=+b.dataset.ta,q=POOL[tqIdx],ok=i===q.a;
+ if(ok){G.pts+=8;say("+8 ⭐ To'g'ri!");saveGame()}else{G.pts=Math.max(0,G.pts-2);say("−2 ⭐ Noto'g'ri. "+q.f,3500)}
+ tqIdx=-1;renderTestsHome()});
+$("tc_close").onclick=()=>{$("testsModal").classList.remove("show");G.modal=false};
+
+// ── Do'kon ───────────────────────────────────────────────────────
+function openShop(){G.modal=true;renderShop();$("shopModal").classList.add("show")}
+function renderShop(){$("shopBal").textContent="⭐ Ballar: "+G.pts;
+ $("shopBody").innerHTML=SHOPLIST.map(it=>{const own=G.own.includes(it.id);
+  return `<div class="row"><span><b>${it.n}</b><br><small style="opacity:.6">${it.desc}</small></span><button data-buy="${it.id}" ${G.pts<it.p||own?"disabled":""}>${own?"✓":"Sotib ol"} ${it.p}⭐</button></div>`}).join("")}
+$("shopBody").addEventListener("click",e=>{const b=e.target.closest("button[data-buy]");if(!b||b.disabled)return;
+ const id=b.dataset.buy,it=SHOPLIST.find(x=>x.id===id);if(!it||G.pts<it.p)return;
+ if(id==="shotgun"||id==="rifle"){G.pts-=it.p;if(!G.own.includes(id))G.own.push(id);G.cur=id;G.ammo[id]=(G.ammo[id]||0)+12}
+ else if(id==="ammo"){if(G.cur==="pistol"){say("Avval miltiq yoki avtomat oling");return}G.pts-=it.p;G.ammo[G.cur]+=20}
+ else if(id==="med"){if(G.hearts>=5){say("Jon to'liq");return}G.pts-=it.p;G.hearts++}
+ else if(id==="shield"){G.pts-=it.p;G.own.push("shield")}
+ say("✔ Sotib olindi");saveGame();renderShop()});
+$("sh_close").onclick=()=>{$("shopModal").classList.remove("show");G.modal=false};
+
+// ── Bilim kitobi ─────────────────────────────────────────────────
+function openBook(){if(G.modal)return;G.modal=true;
+ $("bookBody").innerHTML=G.learned.length?G.learned.map(i=>`<p><b>${POOL[i].s}:</b> ${POOL[i].f}</p>`).join(""):"<p>Hali bilim yo'q. Kunduzi laboratoriyalarga yaqinlashing.</p>";
+ $("bookModal").classList.add("show")}
+$("bk_close").onclick=()=>{$("bookModal").classList.remove("show");G.modal=false};
+
+// ── Sozlamalar ───────────────────────────────────────────────────
+function openSettings(){G.modal=true;$("settingsModal").classList.add("show")}
+$("sq_close").onclick=()=>{$("settingsModal").classList.remove("show");G.modal=false};
+$("sq_day").onclick=()=>{setNight(false);G.cycleT=0};$("sq_night").onclick=()=>{setNight(true);G.cycleT=0};
+function setQ(n){QL=n;localStorage.setItem("dino_q",n);R.setPixelRatio(Q().pr);R.shadowMap.enabled=Q().sh>0;sun.castShadow=Q().sh>0;sun.shadow.mapSize.set(Q().sm,Q().sm);if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null}ptGeo.setDrawRange(0,Q().pt);say("Grafika: "+{low:"past",med:"o'rta",high:"yuqori"}[n])}
+$("sq0").onclick=()=>setQ("low");$("sq1").onclick=()=>setQ("med");$("sq2").onclick=()=>setQ("high");
+$("sensR").oninput=e=>{G.sens=+e.target.value;$("sensV").textContent=e.target.value};
+$("volR").oninput=e=>{G.vol=+e.target.value/10;$("volV").textContent=e.target.value};
+$("sq_save").onclick=()=>{saveGame();say("💾 Saqlandi")};
+$("sq_load").onclick=()=>{if(loadGame())say("📂 Yuklandi");else say("Saqlangan o'yin topilmadi")};
+
+// Video yozish
+let MR=null,chunks=[];
+function recToggle(){if(MR&&MR.state!=="inactive"){MR.stop();return}
+ try{MR=new MediaRecorder(R.domElement.captureStream(30),{videoBitsPerSecond:4e6});chunks=[];
+  MR.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+  MR.onstop=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(chunks,{type:"video/webm"}));a.download="dino-"+Date.now()+".webm";a.click();$("recBtn").textContent="● Boshlash (B)";say("Video saqlandi")};
+  MR.start(1000);$("recBtn").textContent="■ To'xtatish";say("● Yozuv boshlandi")}catch(e){say("Bu brauzerda yozish ishlamaydi")}}
+$("recBtn").onclick=recToggle;
+
+// ── Zarar, o'lim ─────────────────────────────────────────────────
+function hit(n){if(G.inv>0)return;G.inv=1.4;
+ if(G.own.includes("shield")&&n>0){const si=G.own.indexOf("shield");G.own.splice(si,1);say("🛡 Qalqon zarba oldini oldi!");noise(.3,.2);return}
+ G.hearts-=n;hurtFx=1;noise(.45,.3,()=>{});say("Maxluq sizni urdi! 😱");if(G.hearts<=0)die()}
+function die(){G.hearts=3;clearMons();plGrp.position.set(0,0,0);respawnT=T+10;say("Maxluqlar sizni yedi... Bilimlaringiz saqlanadi.",3500);saveGame()}
+
+// ── O'q otish ────────────────────────────────────────────────────
+const rcGun=new THREE.Raycaster();
+function fire(){if(!G.night||G.modal||!G.started||cdT>0)return;
+ const w=WEP[G.cur];if(G.cur!=="pistol"&&G.ammo[G.cur]<=0){say("O'q tugadi! Do'kondan oling 🛒");cdT=.4;return}
+ if(G.cur!=="pistol")G.ammo[G.cur]--;cdT=w.cd;shotT=.09;tone(200,.18,.1,"square");noise(.28,.12);
+ const hit2=new Set();
+ for(let p=0;p<w.pel;p++){rcGun.setFromCamera(new THREE.Vector2(rnd(-w.sp,w.sp),rnd(-w.sp,w.sp)),cam);
+  const h=rcGun.intersectObjects(MON.map(m=>m.g),true)[0];
+  if(h){const m=MON.find(m=>m.g.getObjectById(h.object.id));if(m)hit2.add(m)}}
+ hit2.forEach(m=>{m.hp-=w.dmg;if(m.hp<=0){G.pts+=m.type==="ghost"?6:m.type==="shadow"?8:10;removeMon(m);say("+"+(m.type==="ghost"?6:m.type==="shadow"?8:10)+" ⭐")}})}
+
+// ── Saqlash ───────────────────────────────────────────────────────
+const SK2="dino3d_v1";
+function saveGame(){try{localStorage.setItem(SK2,JSON.stringify({done:DONE,learned:G.learned,pts:G.pts,night:G.night,own:G.own,cur:G.cur,ammo:G.ammo,hearts:G.hearts}))}catch(e){}}
+function loadGame(){let d;try{d=JSON.parse(localStorage.getItem(SK2))}catch(e){}if(!d)return false;
+ d.done.forEach((v,i)=>DONE[i]=v);G.learned=d.learned||[];G.pts=d.pts||0;G.own=d.own||["pistol"];G.cur=d.cur||"pistol";G.ammo=d.ammo||{shotgun:0,rifle:0};G.hearts=d.hearts||3;
+ plGrp.position.set(0,0,0);setNight(!!d.night);refreshStations();return true}
+
+// ── Intro yulduzlar ──────────────────────────────────────────────
+(()=>{const el=$("starsEl"),n=120;for(let i=0;i<n;i++){const s=document.createElement("div");
+ Object.assign(s.style,{position:"absolute",width:(Math.random()*2.5+.5)+"px",height:(Math.random()*2.5+.5)+"px",background:"#fff",borderRadius:"50%",left:Math.random()*100+"%",top:Math.random()*100+"%",opacity:Math.random()*.8+.2,animation:`twinkle ${rnd(2,5)}s ${rnd(0,4)}s infinite alternate`});
+ el.appendChild(s)}
+ const style=document.createElement("style");style.textContent="@keyframes twinkle{from{opacity:.2;transform:scale(.8)}to{opacity:1;transform:scale(1.2)}}";document.head.appendChild(style)})();
+
+// ── Intro tugmalar ───────────────────────────────────────────────
+function startPlay(resume){audInit();
+ $("intro").style.transition="opacity .6s";$("intro").style.opacity=0;setTimeout(()=>$("intro").style.display="none",600);
+ $("hud").style.display="block";$("cross").style.display="block";$("nmBtn").style.display="block";
+ if("ontouchstart" in window)$("fireBtn").style.display="block";
+ G.started=true;if(!resume){DONE.fill(false);G.learned=[];G.pts=0;G.hearts=3;G.own=["pistol"];G.cur="pistol";G.ammo={shotgun:0,rifle:0};G.night=false;plGrp.position.set(0,0,0);setNight(false);refreshStations();saveGame()}
+ say("WASD: harakat · Sichqoncha: qarash · Bo'shliq: otish",4000)}
+$("i_play").onclick=()=>startPlay(false);
+$("i_tests").onclick=()=>openTests();
+$("i_shop").onclick=()=>openShop();
+$("i_settings").onclick=()=>openSettings();
+$("nmBtn").onclick=()=>{audInit();setNight(!G.night);G.cycleT=0};
+
+// ── Boshqaruv ────────────────────────────────────────────────────
+const keys={};
+addEventListener("keydown",e=>{audInit();
+ if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code))e.preventDefault();
+ if(qMode||$("quizModal").classList.contains("show"))return;
+ if(e.code==="Escape"){if(G.started&&!G.modal){openSettings()}return}
+ if(!G.started)return;
+ if(e.code==="KeyK")openBook();
+ else if(e.code==="KeyT")openShop();
+ else if(e.code==="KeyN"&&!G.modal){setNight(!G.night);G.cycleT=0}
+ else if(e.code==="KeyB")recToggle();
+ else if(e.code==="KeyQ"&&!G.modal&&G.own.length>1){const i=G.own.indexOf(G.cur);G.cur=G.own[(i+1)%G.own.length];say("🔫 "+WEP[G.cur]?.n||G.cur)}
+ else if(e.code==="Space")fire();
+ keys[e.code]=true});
+addEventListener("keyup",e=>keys[e.code]=false);
+addEventListener("blur",()=>{for(const k in keys)keys[k]=false});
+document.querySelectorAll(".pad button[data-k]").forEach(b=>{const k=b.dataset.k;
+ b.addEventListener("pointerdown",e=>{e.preventDefault();audInit();keys[k]=true});
+ ["pointerup","pointerleave","pointercancel"].forEach(ev=>b.addEventListener(ev,()=>keys[k]=false))});
+$("fireBtn").addEventListener("pointerdown",e=>{e.preventDefault();fire()});
+
+// 360° kamera (sichqoncha + strelka + g'ildirak)
+let yaw=0,pitch=.42,dist=7,dragD=null,moved=0;
+$("c").addEventListener("pointerdown",e=>{dragD={x:e.clientX,y:e.clientY};moved=0});
+addEventListener("pointermove",e=>{if(!dragD)return;const dx=e.clientX-dragD.x,dy=e.clientY-dragD.y;moved+=Math.abs(dx)+Math.abs(dy);
+ const sens=G.sens*.0012;yaw-=dx*sens;pitch=clamp(pitch+dy*(sens*.7),-.15,1.3);dragD={x:e.clientX,y:e.clientY}});
+addEventListener("pointerup",()=>{if(dragD&&moved<5&&G.night&&!G.modal&&G.started)fire();dragD=null});
+addEventListener("wheel",e=>{dist=clamp(dist+e.deltaY*.007,2.5,16)},{passive:true});
+
+// ── Asosiy loop ──────────────────────────────────────────────────
+const rV=new V(),fV=new V();
+function update(dt){
+ // Silliq kun/tun almashinuvi
+ const tk=SK[G.night?"night":"day"],k=1-Math.exp(-2*dt);
+ hemi.intensity+=(tk.h-hemi.intensity)*k;sun.intensity+=(tk.s-sun.intensity)*k;
+ sc.fog.color.lerp(new THREE.Color(tk.bg),k);sc.background.lerp(new THREE.Color(tk.bg),k);
+ sc.fog.near+=(tk.fn-sc.fog.near)*k;sc.fog.far+=(tk.ff-sc.fog.far)*k;
+ torchL.intensity+=((G.night?2.6:0)-torchL.intensity)*k;
+ // Timer
+ G.inv-=dt;cdT-=dt;shotT-=dt;gunGrp.position.z=shotT>0?-.43:-.48;
+ // Test timer
+ if(qMode==="test"&&G.modal){G.quizT-=dt;$("tbi").style.width=clamp(G.quizT/14,0,1)*100+"%";if(G.quizT<=0)answer(-1)}
+ if(G.modal||!G.started)return;
+ // Harakat
+ let mv=false;
+ const f=(keys.KeyW?1:0)-(keys.KeyS?1:0),r2=(keys.KeyD?1:0)-(keys.KeyA?1:0);
+ if(keys.ArrowLeft)yaw+=dt*2;if(keys.ArrowRight)yaw-=dt*2;
+ if(keys.ArrowUp)pitch=clamp(pitch+dt,-.15,1.3);if(keys.ArrowDown)pitch=clamp(pitch-dt,-.15,1.3);
+ let mx=-Math.sin(yaw)*f+Math.cos(yaw)*r2,mz=-Math.cos(yaw)*f-Math.sin(yaw)*r2;
+ const L=Math.hypot(mx,mz);if(L>0){mv=true;mx/=L;mz/=L;plGrp.position.x+=mx*4.4*dt;plGrp.position.z+=mz*4.4*dt;plGrp.rotation.y=Math.atan2(mx,mz)}
+ for(const o of OB){const dx=plGrp.position.x-o.x,dz=plGrp.position.z-o.z,d2=Math.hypot(dx,dz),mn=o.r+.52;if(d2<mn&&d2>0){plGrp.position.x=o.x+dx/d2*mn;plGrp.position.z=o.z+dz/d2*mn}}
+ plGrp.position.x=clamp(plGrp.position.x,-29,29);plGrp.position.z=clamp(plGrp.position.z,-29,29);
+ // Laboratoriya yaqinlashuvi (kunduz)
+ if(!G.night){for(const st of STM){if(DONE[st.i])continue;if(Math.hypot(st.x-plGrp.position.x,st.z-plGrp.position.z)<1.6){startQuiz("learn",st);break}}}
+ // Bilim sinovi (tun, har 40-70 soniyada)
+ if(G.night&&T>G.nextTest&&G.learned.length&&!MON.find(m=>m.test)){G.nextTest=T+rnd(40,70);const a=Math.random()*6.28,d3=rnd(5,8);const m=mkMon("shadow",plGrp.position.x+Math.cos(a)*d3,plGrp.position.z+Math.sin(a)*d3,true);startQuiz("test",null,m)}
+ // Maxluq spawn
+ if(G.night&&T>respawnT&&MON.filter(m=>!m.test).length<5){spawnFar();respawnT=T+10}
+ // Maxluq AI
+ for(const m of MON){const p=m.g.position,dx=plGrp.position.x-p.x,dz=plGrp.position.z-p.z,d4=Math.hypot(dx,dz)||1;
+  const rng=m.type==="ghost"?26:16;if(!m.test&&d4<rng){p.x+=dx/d4*m.sp*dt;p.z+=dz/d4*m.sp*dt;m.g.rotation.y=Math.atan2(dx,dz)}
+  if(m.type==="ghost"){p.y=Math.sin(T*1.8+m.ph)*.35+.8}
+  if(!m.test&&d4<1.15&&G.inv<=0)hit(1)}
+ // Kunduzgi hayvonlar
+ for(const h of HB){const p=h.d.g.position,dx=h.tx-p.x,dz=h.tz-p.z,d5=Math.hypot(dx,dz);
+  if(d5<1){h.tx=rnd(-18,18);h.tz=rnd(-18,18)}else{p.x+=dx/d5*.65*dt;p.z+=dz/d5*.65*dt;h.d.g.rotation.y=Math.atan2(dx,dz)}
+  animDino(h.d,T+h.tx,d5>.8,false)}
+ // Kun/tun avto (120 son)
+ G.cycleT+=dt;if(G.cycleT>=120){G.cycleT=0;setNight(!G.night)}
+ // Portal
+ if(exitRing.visible&&Math.hypot(24-plGrp.position.x,-24-plGrp.position.z)<2.2){$("winCard").innerHTML=`<h2>🏁 Tabriklaymiz!</h2><p>Barcha laboratoriyalarni tugatdingiz va ${G.learned.length} ta bilimni egalladingiz!</p><p>⭐ Ballar: <b>${G.pts}</b></p><button class="big" id="wnew">↻ Yangi o'yin</button>`;$("winModal").classList.add("show");G.modal=true}
+ // Zarrachalar harakati
+ for(let i=0;i<Q().pt;i++){ptArr[i*3+1]+=.0015+Math.sin(T*.7+i)*.001;if(ptArr[i*3+1]>7)ptArr[i*3+1]=.1;ptArr[i*3]+=Math.cos(T*.4+i)*.001}
+ ptGeo.attributes.position.needsUpdate=true;
+ // Stansiya animatsiya
+ STM.forEach(s=>{if(!DONE[s.i]){s.ring.scale.setScalar(1+Math.sin(T*4+s.i)*.06)}});
+ exitRing.rotation.z+=dt*.4;exitGlow.rotation.z-=dt*.2;
+ animDino(PD,T,mv,G.night);
+ // Qizil ogohlantirish
+ if(hurtFx>0){hurtFx-=dt*1.6;document.body.style.background=`rgba(140,0,0,${Math.max(0,hurtFx)*.4})`}else document.body.style.background="#000";
+ // Kamera
+ const tx=plGrp.position.x,ty=1.6,tz=plGrp.position.z,cp=Math.cos(pitch),fovT=mv?70:65;
+ cam.fov+=(fovT-cam.fov)*Math.min(1,5*dt);cam.updateProjectionMatrix();
+ cam.position.lerp(rV.set(tx+Math.sin(yaw)*cp*dist,ty+Math.sin(pitch)*dist+.5,tz+Math.cos(yaw)*cp*dist),1-Math.exp(-10*dt));
+ cam.lookAt(tx,ty,tz);
+ sun.position.set(tx+12,22,tz+10);sun.target.position.set(tx,0,tz);
+ torchL.position.copy(cam.position);torchL.target.position.copy(cam.position).add(cam.getWorldDirection(fV).multiplyScalar(14));
+ ambient();hud()}
+
+$("winModal").addEventListener("click",e=>{if(e.target.id==="wnew"){$("winModal").classList.remove("show");G.modal=false;$("hud").style.display="none";$("cross").style.display="none";$("nmBtn").style.display="none";$("fireBtn").style.display="none";$("intro").style.display="flex";$("intro").style.opacity=0;setTimeout(()=>$("intro").style.opacity=1,50);$("intro").style.transition="opacity .5s"}});
+
+function loop(now){requestAnimationFrame(loop);const dt=Math.min((now-(loop.t||now))/1000,.05);loop.t=now;T+=dt;
+ try{update(dt)}catch(e){$("err").style.display="block";$("err").textContent="Xato: "+e.message}
+ R.render(sc,cam)}
+
+setNight(false);refreshStations();requestAnimationFrame(loop);
+</script>
+</body>
+</html>
